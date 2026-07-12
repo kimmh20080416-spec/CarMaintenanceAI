@@ -238,12 +238,39 @@ private fun ModeChip(
 
 @Composable
 private fun ModelStatusText(status: ModelStatus) {
-    val (text, color) = when (status) {
-        is ModelStatus.Found -> "AI 모델 사용 가능: ${status.modelFile}" to Color(0xFF2E7D32)
-        is ModelStatus.LoadFailed -> "AI 모델 로드 실패 (${status.modelFile}): ${status.reason}" to Color(0xFFB3261E)
-        ModelStatus.NotFound -> "assets 폴더에 학습된 모델(.tflite)이 없습니다. 주파수 분석 모드로 동작합니다." to Color(0xFF9E9E9E)
+    when (status) {
+        is ModelStatus.Found -> {
+            Column {
+                Text(
+                    "AI 모델 사용 가능: ${status.modelFile}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF2E7D32)
+                )
+                Text(
+                    status.debugInfo,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF9E9E9E)
+                )
+                status.warning?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = Color(0xFFB3261E))
+                }
+            }
+        }
+        is ModelStatus.LoadFailed -> {
+            Text(
+                "AI 모델 로드 실패 (${status.modelFile}): ${status.reason}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFFB3261E)
+            )
+        }
+        ModelStatus.NotFound -> {
+            Text(
+                "assets 폴더에 sound_model.tflite / labels.txt가 없습니다. 주파수 분석 모드로 동작합니다.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF9E9E9E)
+            )
+        }
     }
-    Text(text, style = MaterialTheme.typography.bodyMedium, color = color)
 }
 
 @Composable
