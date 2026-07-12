@@ -1,0 +1,68 @@
+# 차량 AI 정비사 (Car Maintenance AI)
+
+인공지능 기반 자동차 정비 보조 앱입니다. 두 가지 핵심 기능이 있습니다.
+
+## 1. 소리 진단
+마이크로 엔진/하체 소음을 녹음하면, 주파수 분석을 통해 어떤 부위의 이상음인지 추정해줍니다.
+
+**⚠️ 중요 - 기본 상태의 한계**
+지금 기본으로 들어있는 분류기(`HeuristicSoundClassifier`)는 실제 학습된 딥러닝 모델이 아니라,
+"저주파는 엔진/마운트, 고주파는 브레이드/베어링" 같은 **일반적인 경험칙을 코드로 옮긴 규칙 기반 분류기**입니다.
+
+**✅ 실제 AI 모델 적용하는 방법 (코딩 없이 가능)**
+1. https://teachablemachine.withgoogle.com 접속 → "Audio Project" 선택
+2. 정상음/벨트마찰음/브레이크스퀼음 등 카테고리별로 소리 클립을 각각 20~30개 이상 녹음
+3. "Train Model" 클릭 (브라우저에서 자동 학습)
+4. "Export Model" → TensorFlow Lite → 다운로드
+5. 다운로드한 모델 파일을 `sound_model.tflite`, 라벨 파일을 `labels.txt`로 이름 바꿔서
+   `app/src/main/assets/` 폴더에 넣기 (이미 안내 파일이 그 폴더에 있음)
+6. 그대로 다시 push하면 끝 — 앱이 자동으로 이 모델을 감지해서 사용합니다
+   (`SoundClassifierProvider`가 assets에 모델이 있는지 확인 후 자동 전환, 코드 수정 불필요)
+
+모델이 없으면 자동으로 기존 주파수 분석 방식으로 폴백되니 앱이 깨지지 않습니다.
+
+**✅ AI / 주파수분석 선택 토글**
+화면 상단에 "AI 모델" / "주파수 분석" 두 버튼이 있어 원하는 방식을 직접 고를 수 있습니다.
+AI 모델이 assets에 없거나 로드에 실패하면 "AI 모델" 버튼이 비활성화되고,
+바로 아래에 **왜 안 되는지 이유**(파일 없음 / 로드 실패 사유)가 텍스트로 표시됩니다.
+
+**모델을 넣었는데 안 될 때 체크리스트**
+1. 파일이 정확히 `app/src/main/assets/` 폴더 안에 있는지 (하위 폴더 아님)
+2. 확장자가 `.tflite`인지 (이름은 상관없이 자동 탐지됨)
+3. 앱 화면에 뜨는 상태 문구를 확인 — "로드 실패"라고 뜨면 사유가 같이 표시됨
+   (Teachable Machine 오디오 모델은 특수 연산자를 써서, `tensorflow-lite-select-tf-ops`
+   의존성을 이미 추가해뒀지만 그래도 실패하면 Netron(netron.app)으로 모델의
+   input/output shape를 확인해서 `TFLiteSoundClassifier.kt`의 전처리 부분을 맞춰야 할 수 있습니다)
+4. GitHub Actions로 다시 빌드했는지, 새로 빌드된 APK를 폰에 재설치했는지 (구버전 APK가 남아있으면 반영 안 됨)
+
+## 2. 정비 추천
+차량 모델명, 현재 주행거리, 연료 타입(가솔린/디젤/하이브리드)을 입력하면
+엔진오일, 브레이크 패드, 타이밍벨트 등 표준 소모품 교체 주기를 기준으로
+"지금 교체할 때가 됐는지", "얼마나 더 탈 수 있는지"를 알려줍니다.
+(`data/MaintenanceSchedule.kt`에 정비 주기 데이터가 있습니다. 필요시 차종별로 세분화할 수 있습니다.)
+
+## UI
+흰 배경 + 검정 텍스트/버튼의 모던하고 미니멀한 디자인으로 구성했습니다.
+
+---
+
+## APK 빌드 방법 (GitHub Actions로 자동 빌드)
+
+이 환경은 네트워크가 막혀 있어 여기서 직접 APK를 만들 수 없습니다.
+대신 `.github/workflows/build-apk.yml`을 넣어뒀으니, GitHub에 올리기만 하면 자동으로 빌드됩니다.
+
+1. 이 프로젝트 폴더를 새 GitHub 저장소에 push
+   ```bash
+   git init
+   git add .
+   git commit -m "Car Maintenance AI 초기 버전"
+   git branch -M main
+   git remote add origin <본인의 저장소 URL>
+   git push -u origin main
+   ```
+2. GitHub 저장소 페이지 → **Actions** 탭 → "Build Debug APK" 워크플로우가 자동으로 실행됩니다.
+3. 완료되면 해당 실행 결과 페이지 하단 **Artifacts**에서 `car-maintenance-ai-debug-apk`를 다운로드하세요.
+4. 압축을 풀면 `app-debug.apk`가 나옵니다. 이 파일을 핸드폰으로 옮겨서 설치하면 됩니다.
+   (설치 시 "출처를 알 수 없는 앱 설치 허용"이 필요할 수 있습니다.)
+
+코드를 수정하고 다시 push할 때마다 자동으로 새 APK가 빌드됩니다.
