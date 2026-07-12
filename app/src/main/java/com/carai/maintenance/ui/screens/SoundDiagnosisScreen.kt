@@ -3,6 +3,7 @@ package com.carai.maintenance.ui.screens
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -217,28 +218,23 @@ private fun ModeChip(
     Box(
         modifier = modifier
             .background(bg, RoundedCornerShape(10.dp))
-            .padding(vertical = 10.dp)
             .then(
                 if (enabled) {
-                    Modifier.androidx_clickable(interactionSource, onClick)
-                } else Modifier
-            ),
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = onClick
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(label, color = fg, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
     }
 }
-
-private fun Modifier.androidx_clickable(
-    interactionSource: androidx.compose.foundation.interaction.MutableInteractionSource,
-    onClick: () -> Unit
-): Modifier = this.then(
-    androidx.compose.foundation.clickable(
-        interactionSource = interactionSource,
-        indication = null,
-        onClick = onClick
-    )
-)
 
 @Composable
 private fun ModelStatusText(status: ModelStatus) {
