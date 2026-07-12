@@ -1,7 +1,0 @@
-이 폴더에 아래 두 파일을 넣으면 앱이 자동으로 휴리스틱 대신 실제 AI 모델을 사용합니다.
-
-1. sound_model.tflite   ← Teachable Machine(Audio Project)에서 export한 모델
-2. labels.txt           ← 한 줄에 라벨 하나씩, 모델 출력 순서와 동일하게
-
-두 파일이 없으면 앱은 자동으로 기존 주파수 분석(휴리스틱) 방식으로 동작합니다.
-자세한 방법은 프로젝트 루트의 README.md를 참고하세요.
