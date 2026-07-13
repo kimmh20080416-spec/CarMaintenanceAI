@@ -32,8 +32,30 @@ class TFLiteSoundClassifier(context: Context) : SoundClassifier {
     override val recommendedSampleCount: Int
         get() = inputSize
 
+    /** Flex(select TF ops) 델리게이트가 실제로 붙었는지 여부 (진단용) */
+    val flexDelegateAttached: Boolean
+
     init {
-        interpreter = Interpreter(loadModelFile(context, MODEL_FILE_NAME))
+        val options = Interpreter.Options()
+        // Flex 커널이 멀티스레드에서 NaN을 내는 사례가 보고되어 있어 1개로 고정
+        options.setNumThreads(1)
+
+        var flexAttached = false
+        try {
+            // select-tf-ops 아티팩트가 있으면 이 클래스가 존재합니다.
+            // 리플렉션으로 로드해서, 없는 환경에서도 컴파일/실행이 깨지지 않게 합니다.
+            val flexDelegateClass = Class.forName("org.tensorflow.lite.flex.FlexDelegate")
+            val flexDelegate = flexDelegateClass.getDeclaredConstructor().newInstance() as org.tensorflow.lite.Delegate
+            options.addDelegate(flexDelegate)
+            flexAttached = true
+        } catch (e: Throwable) {
+            // FlexDelegate 클래스를 못 찾으면 select-tf-ops가 제대로 안 붙은 것.
+            // 그래도 기본 Interpreter로는 로드를 시도합니다 (Flex 없이 되는 모델일 수도 있으니).
+            flexAttached = false
+        }
+        flexDelegateAttached = flexAttached
+
+        interpreter = Interpreter(loadModelFile(context, MODEL_FILE_NAME), options)
         labels = context.assets.open(LABEL_FILE_NAME).bufferedReader().readLines()
             .map { it.trim() }
             .filter { it.isNotBlank() }
@@ -46,7 +68,8 @@ class TFLiteSoundClassifier(context: Context) : SoundClassifier {
     }
 
     fun debugInfo(): String =
-        "입력 shape=${inputShape.joinToString(",", "[", "]")}, 출력 클래스 수=$outputSize, 라벨 수=${labels.size}"
+        "입력 shape=${inputShape.joinToString(",", "[", "]")}, 출력 클래스 수=$outputSize, " +
+            "라벨 수=${labels.size}, Flex 델리게이트=${if (flexDelegateAttached) "연결됨" else "못 찾음"}"
 
     override fun classify(samples: DoubleArray, sampleRate: Int): SoundResult {
         // 모델이 요구하는 길이에 정확히 맞춤: 부족하면 0으로 채우고, 넘치면 앞부분만 사용
@@ -75,14 +98,17 @@ class TFLiteSoundClassifier(context: Context) : SoundClassifier {
 
         if (hasNaN || isAllZero) {
             val dump = rawOutput.joinToString(", ") { "%.4f".format(it) }
+            val flexNote = if (flexDelegateAttached) {
+                "Flex 델리게이트는 연결됐지만 그래도 NaN이 나왔습니다. 스레드/연산 자체의 수치 불안정 문제일 수 있습니다."
+            } else {
+                "Flex 델리게이트를 찾지 못했습니다 (select-tf-ops 의존성이 최종 APK에 제대로 포함 안 됐을 가능성)."
+            }
             return SoundResult(
                 label = "출력값 이상",
                 confidence = 0f,
                 dominantFrequencyHz = 0.0,
                 loudnessDb = 0.0,
-                detail = "모델이 유효한 값을 내놓지 않았습니다 (raw=[$dump]). " +
-                    "모델이 select TF ops(Flex)를 요구하는데 제대로 지원되지 않거나, " +
-                    "입력 형식이 학습 때와 달라서일 수 있습니다."
+                detail = "모델이 유효한 값을 내놓지 않았습니다 (raw=[$dump]). $flexNote"
             )
         }
 
