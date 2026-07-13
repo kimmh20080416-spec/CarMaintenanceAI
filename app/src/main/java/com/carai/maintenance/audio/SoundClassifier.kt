@@ -21,6 +21,10 @@ data class SoundResult(
  * (예: assets/engine_sound_model.tflite 를 로드해서 classify()에서 추론)
  */
 interface SoundClassifier {
+    /** 이 분류기가 정확도를 위해 원하는 샘플 개수. 기본값은 약 1.5초(44100Hz 기준) */
+    val recommendedSampleCount: Int
+        get() = 66150
+
     fun classify(samples: DoubleArray, sampleRate: Int): SoundResult
 }
 

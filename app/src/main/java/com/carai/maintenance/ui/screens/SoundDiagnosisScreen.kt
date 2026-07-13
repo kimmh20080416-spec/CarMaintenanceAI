@@ -95,27 +95,36 @@ fun SoundDiagnosisScreen() {
                         isRecording = true
                         result = null
                         scope.launch {
+                            // 선택된 모드에 맞는 분류기를 먼저 정해서, 그 분류기가 원하는
+                            // 샘플 개수만큼 정확히 녹음합니다.
+                            val classifier = if (mode == AnalysisMode.AI) {
+                                SoundClassifierProvider.createAiClassifier(context)
+                                    ?: SoundClassifierProvider.createHeuristicClassifier()
+                            } else {
+                                SoundClassifierProvider.createHeuristicClassifier()
+                            }
+                            val neededSamples = classifier.recommendedSampleCount
+
                             val started = withContext(Dispatchers.IO) { capture.start() }
                             if (!started) {
                                 isRecording = false
                                 return@launch
                             }
-                            // 약 1.5초 분량(약 16 청크)을 모아 하나로 합쳐서 분석
-                            val collected = ArrayList<Double>()
+                            val collected = ArrayList<Double>(neededSamples)
                             withContext(Dispatchers.IO) {
-                                repeat(16) {
-                                    capture.readChunk()?.let { chunk -> collected.addAll(chunk.toList()) }
+                                while (collected.size < neededSamples) {
+                                    val chunk = capture.readChunk() ?: break
+                                    collected.addAll(chunk.toList())
                                 }
                                 capture.stop()
                             }
-                            val samples = collected.toDoubleArray()
+                            // 필요한 만큼만 정확히 자르기 (부족하면 있는 만큼만, classify 내부에서 0으로 패딩)
+                            val samples = if (collected.size > neededSamples) {
+                                collected.subList(0, neededSamples).toDoubleArray()
+                            } else {
+                                collected.toDoubleArray()
+                            }
                             if (samples.isNotEmpty()) {
-                                val classifier = if (mode == AnalysisMode.AI) {
-                                    SoundClassifierProvider.createAiClassifier(context)
-                                        ?: SoundClassifierProvider.createHeuristicClassifier()
-                                } else {
-                                    SoundClassifierProvider.createHeuristicClassifier()
-                                }
                                 result = withContext(Dispatchers.Default) {
                                     classifier.classify(samples, AudioCapture.SAMPLE_RATE)
                                 }
