@@ -103,12 +103,14 @@ class TFLiteSoundClassifier(context: Context) : SoundClassifier {
             } else {
                 "Flex 델리게이트를 찾지 못했습니다 (select-tf-ops 의존성이 최종 APK에 제대로 포함 안 됐을 가능성)."
             }
+            val inputStats = inputStatsSummary(input)
             return SoundResult(
                 label = "출력값 이상",
                 confidence = 0f,
                 dominantFrequencyHz = 0.0,
                 loudnessDb = 0.0,
-                detail = "모델이 유효한 값을 내놓지 않았습니다 (raw=[$dump]). $flexNote"
+                detail = "모델이 유효한 값을 내놓지 않았습니다 (raw=[$dump]). $flexNote " +
+                    "입력 데이터: $inputStats"
             )
         }
 
@@ -149,6 +151,16 @@ class TFLiteSoundClassifier(context: Context) : SoundClassifier {
         val exps = FloatArray(raw.size) { i -> exp((raw[i] - max).toDouble()).toFloat() }
         val expSum = exps.sum().coerceAtLeast(1e-9f)
         return FloatArray(raw.size) { i -> exps[i] / expSum }
+    }
+
+    private fun inputStatsSummary(input: FloatArray): String {
+        val nanCount = input.count { it.isNaN() || it.isInfinite() }
+        val min = input.minOrNull() ?: 0f
+        val max = input.maxOrNull() ?: 0f
+        val mean = if (input.isNotEmpty()) input.sum() / input.size else 0f
+        val allZero = input.all { it == 0f }
+        return "길이=${input.size}, min=%.3f, max=%.3f, mean=%.4f, NaN개수=$nanCount, 전부0=$allZero"
+            .format(min, max, mean)
     }
 
     private fun loadModelFile(context: Context, assetName: String): MappedByteBuffer {
