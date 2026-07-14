@@ -9,15 +9,20 @@
 지금 기본으로 들어있는 분류기(`HeuristicSoundClassifier`)는 실제 학습된 딥러닝 모델이 아니라,
 "저주파는 엔진/마운트, 고주파는 브레이드/베어링" 같은 **일반적인 경험칙을 코드로 옮긴 규칙 기반 분류기**입니다.
 
-**✅ 실제 AI 모델 적용하는 방법 (코딩 없이 가능)**
-1. https://teachablemachine.withgoogle.com 접속 → "Audio Project" 선택
-2. 정상음/벨트마찰음/브레이크스퀼음 등 카테고리별로 소리 클립을 각각 20~30개 이상 녹음
-3. "Train Model" 클릭 (브라우저에서 자동 학습)
-4. "Export Model" → TensorFlow Lite → 다운로드
-5. 다운로드한 모델 파일을 `sound_model.tflite`, 라벨 파일을 `labels.txt`로 이름 바꿔서
-   `app/src/main/assets/` 폴더에 넣기 (이미 안내 파일이 그 폴더에 있음)
-6. 그대로 다시 push하면 끝 — 앱이 자동으로 이 모델을 감지해서 사용합니다
-   (`SoundClassifierProvider`가 assets에 모델이 있는지 확인 후 자동 전환, 코드 수정 불필요)
+**✅ 실제 AI 모델 적용하는 방법**
+
+`training/` 폴더의 스크립트를 쓰세요. Colab 기본 환경(추가 `pip install` 없음)만으로
+학습부터 안드로이드용 `.tflite` 변환까지 한 번에 됩니다. 자세한 건
+`training/README.md` 참고. 요약:
+
+1. `training/dataset/train(test)/<클래스이름>/*.wav`에 소리별로 wav 파일 넣기
+   (16kHz mono 16bit PCM 권장, 클래스당 30개 이상)
+2. Colab에서 `training/` 폴더 그대로 올리고 `!python train_wave_cnn.py` 실행
+3. 나온 `sound_model.tflite`, `labels.txt`를 `app/src/main/assets/`에 덮어쓰기
+4. GitHub push → 자동 APK 빌드
+
+이 모델은 원시 파형에 Conv1D를 직접 적용하는 구조라 FFT/Flex 연산자가 필요
+없습니다. 그래서 이전에 겪으신 NaN 문제가 구조적으로 재발하지 않습니다.
 
 모델이 없으면 자동으로 기존 주파수 분석 방식으로 폴백되니 앱이 깨지지 않습니다.
 **파일명은 정확히 `sound_model.tflite`, `labels.txt`여야 인식됩니다** (다른 이름이거나, 예전에 테스트하던
@@ -38,25 +43,18 @@ AI 모델이 없거나 로드에 실패하면 "AI 모델" 버튼이 비활성화
 그냥 1등만 보여서 그런지" 바로 구분할 수 있습니다.
 
 만약 모델 출력이 전부 0이거나 NaN이면 화면에 **"출력값 이상"**이라고 뜨면서
-raw 출력값과 함께 **Flex 델리게이트가 실제로 연결됐는지 여부**도 같이 보여줍니다.
-- "Flex 델리게이트를 찾지 못했습니다" → select-tf-ops 의존성이 최종 APK에 제대로
-  안 들어간 것. `app/build.gradle.kts`의 `tensorflow-lite-select-tf-ops` 버전이
-  `tensorflow-lite` 버전과 동일한지 확인하세요.
-- "Flex 델리게이트는 연결됐지만 그래도 NaN" → 연산 자체의 수치 불안정 문제.
-  이미 스레드를 1개로 고정해뒀는데도 안 되면, TM에서 내보낸 모델 자체가
-  안드로이드 온디바이스 런타임과 궁합이 안 좋은 것으로, 모델을 다시
-  단순한 구조로(가능하면 Flex 없이) 내보내는 걸 시도해봐야 합니다.
+raw 출력값이 같이 표시됩니다. `train_wave_cnn.py`로 만든 모델은 Flex 연산자가
+필요 없는 구조라 이 문제가 원천적으로 안 생겨야 정상입니다. (혹시 예전에 만든
+Teachable Machine 모델을 아직 쓰고 계시다면, 그 모델은 Flex 연산자 이슈로
+NaN이 날 수 있으니 `train_wave_cnn.py`로 새로 만든 모델로 교체하세요.)
 
 추론 도중 예외가 나면 더 이상 조용히 실패하지 않고, 화면에 "AI 추론 오류"와 함께
 예외 메시지가 그대로 표시됩니다.
 
 **모델을 넣었는데 안 될 때 체크리스트**
-1. 파일이 정확히 `app/src/main/assets/` 폴더 안에 있는지 (하위 폴더 아님)
-2. 확장자가 `.tflite`인지 (이름은 상관없이 자동 탐지됨)
+1. 파일명이 정확히 `sound_model.tflite`, `labels.txt`인지 (다른 이름이면 인식 안 됨)
+2. `app/src/main/assets/` 바로 아래에 있는지 (하위 폴더 아님)
 3. 앱 화면에 뜨는 상태 문구를 확인 — "로드 실패"라고 뜨면 사유가 같이 표시됨
-   (Teachable Machine 오디오 모델은 특수 연산자를 써서, `tensorflow-lite-select-tf-ops`
-   의존성을 이미 추가해뒀지만 그래도 실패하면 Netron(netron.app)으로 모델의
-   input/output shape를 확인해서 `TFLiteSoundClassifier.kt`의 전처리 부분을 맞춰야 할 수 있습니다)
 4. GitHub Actions로 다시 빌드했는지, 새로 빌드된 APK를 폰에 재설치했는지 (구버전 APK가 남아있으면 반영 안 됨)
 
 ## 2. 정비 추천

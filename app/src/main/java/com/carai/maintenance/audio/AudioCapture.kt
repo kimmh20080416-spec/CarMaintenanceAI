@@ -14,7 +14,9 @@ import androidx.annotation.RequiresPermission
 class AudioCapture {
 
     companion object {
-        const val SAMPLE_RATE = 44100
+        // YAMNet 기반 모델(TFLite Model Maker)은 16kHz를 기준으로 학습됩니다.
+        // 기존 Teachable Machine 모델을 계속 쓰신다면 44100으로 되돌려도 됩니다.
+        const val SAMPLE_RATE = 16000
         const val CHUNK_SIZE = 4096
     }
 
