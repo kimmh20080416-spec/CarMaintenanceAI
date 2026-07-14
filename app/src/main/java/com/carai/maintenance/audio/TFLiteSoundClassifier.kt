@@ -116,27 +116,29 @@ class TFLiteSoundClassifier(context: Context) : SoundClassifier {
 
         val probs = softmaxIfNeeded(rawOutput)
 
-        // 상위 3개 클래스를 뽑아서 진단용으로 같이 보여줌
+        // 상위 3개 클래스를 뽑아서 진단용으로 같이 보여줌 (한글 이름으로 표시)
         val ranked = probs.indices.sortedByDescending { probs[it] }.take(3)
         val topText = ranked.joinToString(" / ") { idx ->
-            val name = if (idx < labels.size) labels[idx] else "클래스#$idx"
+            val raw = if (idx < labels.size) labels[idx] else "클래스#$idx"
+            val name = LabelTranslations.localize(raw).displayName
             "$name ${(probs[idx] * 100).toInt()}%"
         }
 
         val bestIdx = ranked.first()
         val bestVal = probs[bestIdx]
-        val label = if (bestIdx < labels.size) labels[bestIdx] else "클래스 #$bestIdx"
+        val rawLabel = if (bestIdx < labels.size) labels[bestIdx] else "클래스 #$bestIdx"
+        val localized = LabelTranslations.localize(rawLabel)
 
         val mismatchNote = if (labels.size != outputSize) {
             " (주의: 라벨 ${labels.size}개 vs 모델 출력 ${outputSize}개, 개수가 달라요)"
         } else ""
 
         return SoundResult(
-            label = label,
+            label = localized.displayName,
             confidence = bestVal.coerceIn(0f, 1f),
             dominantFrequencyHz = 0.0,
             loudnessDb = 0.0,
-            detail = "상위 3개: $topText$mismatchNote"
+            detail = "${localized.description}\n\n상위 3개: $topText$mismatchNote"
         )
     }
 

@@ -11,15 +11,22 @@
 
 **✅ 실제 AI 모델 적용하는 방법**
 
-`training/` 폴더의 스크립트를 쓰세요. Colab 기본 환경(추가 `pip install` 없음)만으로
-학습부터 안드로이드용 `.tflite` 변환까지 한 번에 됩니다. 자세한 건
-`training/README.md` 참고. 요약:
+지금 이 zip에는 이미 학습된 `sound_model.tflite`, `labels.txt`가
+`app/src/main/assets/`에 들어있어서 바로 빌드하면 AI 모드가 작동합니다.
+(클래스: background/brake/engine/interior/tire/undercarriage 6종,
+`LabelTranslations.kt`에서 한글 이름/설명으로 자동 변환되어 화면에 표시됩니다.)
+
+다시 학습해서 모델을 바꾸고 싶다면 `training/` 폴더의 스크립트를 쓰세요.
+Colab 기본 환경(추가 `pip install` 없음)만으로 학습부터 안드로이드용 `.tflite`
+변환까지 한 번에 됩니다. 자세한 건 `training/README.md` 참고. 요약:
 
 1. `training/dataset/train(test)/<클래스이름>/*.wav`에 소리별로 wav 파일 넣기
    (16kHz mono 16bit PCM 권장, 클래스당 30개 이상)
 2. Colab에서 `training/` 폴더 그대로 올리고 `!python train_wave_cnn.py` 실행
 3. 나온 `sound_model.tflite`, `labels.txt`를 `app/src/main/assets/`에 덮어쓰기
-4. GitHub push → 자동 APK 빌드
+4. **새 클래스 이름을 썼다면** `LabelTranslations.kt`의 매핑 표에도 한글
+   이름/설명을 추가해주세요 (없는 라벨은 영문 그대로 표시됩니다)
+5. GitHub push → 자동 APK 빌드
 
 이 모델은 원시 파형에 Conv1D를 직접 적용하는 구조라 FFT/Flex 연산자가 필요
 없습니다. 그래서 이전에 겪으신 NaN 문제가 구조적으로 재발하지 않습니다.
